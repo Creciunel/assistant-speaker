@@ -2,6 +2,17 @@ esphome:
   name: assistant-speaker
   friendly_name: assistant_speaker
 
+  on_boot:
+     - priority: -100
+       then:
+         - wait_until: api.connected
+         - delay: 3s
+         - if:
+             condition:
+               switch.is_on: use_wake_word
+             then:
+               - voice_assistant.start_continuous:
+
 esp32:
   board: esp32-s3-devkitc-1
   framework:
@@ -9,6 +20,11 @@ esp32:
 
 # Enable logging
 logger:
+  level: DEBUG
+  logs:
+    component.microphone: DEBUG
+    i2s_audio: DEBUG
+
 
 # Enable Home Assistant API
 api:
@@ -22,13 +38,19 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  fast_connect: True
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Assistant-Speaker"
     password: "WCcFrUBLNjVf"
+    
 
 captive_portal:
+
+# bluetooth_proxy:
+#   active: true
+#   connection_slots: 3
 
 # LED WS2812 pe GPIO21
 light:
@@ -38,3 +60,112 @@ light:
     num_leds: 1
     rgb_order: GRB
     name: "Onboard RGB LED"
+
+i2c:
+  id: bus_a
+  sda: GPIO6
+  scl: GPIO7
+  scan: true
+  frequency: 100kHz
+
+
+i2s_audio:
+  - id: i2s_out
+    i2s_lrclk_pin: GPIO2
+    i2s_bclk_pin: GPIO4
+    
+  - id: i2s_in
+    i2s_lrclk_pin: GPIO8
+    i2s_bclk_pin: GPIO9
+    # dma_buf_len: 60
+  
+
+microphone:
+  platform: i2s_audio 
+  id: external_microphone 
+  adc_type: external 
+  i2s_audio_id: i2s_in
+  i2s_din_pin: GPIO3
+  pdm: false
+  channel: left
+
+media_player:
+  - platform: i2s_audio
+    id: external_speaker
+    name: "Assistant speaker player"
+    i2s_audio_id: i2s_out
+    dac_type: external
+    i2s_dout_pin: GPIO5
+    mode: mono
+
+voice_assistant:
+  id: assist
+  use_wake_word: false
+  microphone: external_microphone
+  media_player: external_speaker
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.5
+
+  on_tts_start:
+  - homeassistant.service:
+      service: tts.speak
+      data:
+        media_player_entity_id: media_player.your_external_speaker
+        message: !lambda 'return x;'
+        entity_id: tts.piper
+
+  on_error:
+    then:
+      - logger.log: "Eroare în asistentul vocal"
+  on_end:
+    then:
+      - logger.log: "Comanda a fost procesată"
+  on_wake_word_detected:
+    then:
+      - logger.log: "Cuvântul de activare a fost detectat!"
+  
+switch:
+  - platform: template
+    name: Use wake word
+    id: use_wake_word
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    on_turn_on:
+      - lambda: id(assist).set_use_wake_word(true);
+      - if:
+          condition:
+            not:
+              - voice_assistant.is_running
+          then:
+            - voice_assistant.start_continuous
+    on_turn_off:
+      - voice_assistant.stop
+      - lambda: id(assist).set_use_wake_word(false);
+  
+# Senzor 
+sensor:
+  - platform: sht3xd
+    i2c_id: bus_a
+    address: 0x44
+    temperature:
+      name: "Room Temperature"
+      filters:
+        - offset: -6.5  # Ajustează dacă e nevoie
+    humidity:
+      name: "Room Humidity"
+      filters:
+        - offset: -2.0
+    update_interval: 60s
+
+  - platform: adc
+    pin: GPIO1
+    name: "Luminozitate ambientală"
+    update_interval: 5s
+    attenuation: 11db
+    # filters:
+    #   - multiply: 3.3
+
+
+
