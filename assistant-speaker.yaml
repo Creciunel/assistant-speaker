@@ -1,0 +1,40 @@
+esphome:
+  name: assistant-speaker
+  friendly_name: assistant_speaker
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "9Vp4MsSeuEPRPQzREY8cezEAgZsGh2ZRFWvGIb0cNCQ="
+
+ota:
+  - platform: esphome
+    password: "aae9973e41180f2dd191c4dd26274466"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Assistant-Speaker"
+    password: "WCcFrUBLNjVf"
+
+captive_portal:
+
+# LED WS2812 pe GPIO21
+light:
+  - platform: fastled_clockless
+    chipset: WS2812
+    pin: GPIO21
+    num_leds: 1
+    rgb_order: GRB
+    name: "Onboard RGB LED"
