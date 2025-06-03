@@ -79,7 +79,7 @@ i2s_audio:
     i2s_bclk_pin: GPIO9
     # dma_buf_len: 60
   
-
+# INMP441 
 microphone:
   platform: i2s_audio 
   id: external_microphone 
